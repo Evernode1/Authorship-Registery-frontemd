@@ -1,0 +1,46 @@
+// The public interface of AuthorshipRegistry, kept next to the source so the Contract page can show it.
+// kind: write | read. who: who may call it. payable: what must be attached, if anything.
+export const METHODS = [
+  { name: "register_work", kind: "write", who: "Anyone", payable: "Bond, at least 0.001 GEN", args: "url, title, content_type, fingerprint", doc: "Registers a link. One record per canonical URL. Content type is POST, THREAD, ARTICLE, REPO, VIDEO or OTHER; fingerprint is empty or a sha256 hex." },
+  { name: "withdraw_registration", kind: "write", who: "Author", payable: "", args: "work_id", doc: "Frees the link. Not allowed while a dispute is open. The bond stays locked until the lock ends." },
+  { name: "release_bond", kind: "write", who: "Author", payable: "", args: "work_id", doc: "Credits the bond back to the author's balance after the 180 day lock, for active or withdrawn works." },
+  { name: "verify_work_ownership", kind: "write", who: "Anyone", payable: "", args: "work_id", doc: "Plain-code check, no model: validators read the page and agree on whether the author's token is in <meta name=\"oar-proof\"> in the HTML head. A body-only match does not count. One-day cooldown. A pass pays the caller a keeper reward." },
+  { name: "open_dispute", kind: "write", who: "Anyone except the author", payable: "Stake, at least 0.005 GEN", args: "work_id, challenger_url, statement", doc: "Starts a dispute with the challenger's earlier page. One open dispute per work, inside the 180 day challenge window." },
+  { name: "respond_to_dispute", kind: "write", who: "Author", payable: "", args: "dispute_id, evidence_url, statement", doc: "One response within the 3 day window: an evidence link, a statement, or both." },
+  { name: "withdraw_dispute", kind: "write", who: "Challenger", payable: "", args: "dispute_id", doc: "Closes an open dispute and refunds the stake minus a 10% fee." },
+  { name: "resolve_dispute", kind: "write", who: "Anyone", payable: "", args: "dispute_id", doc: "Consensus round after the response window or once the author has responded. UPHELD, REJECTED or INCONCLUSIVE; three inconclusive rounds close it." },
+  { name: "fund_rewards", kind: "write", who: "Anyone", payable: "Any amount above zero", args: "", doc: "Adds to the reward pool that pays keepers and resolvers." },
+  { name: "withdraw", kind: "write", who: "Anyone", payable: "", args: "", doc: "Pays out the caller's pending balance. All payouts are pull payments." },
+  { name: "blacklist_address", kind: "write", who: "Admin", payable: "", args: "target, reason", doc: "Blocks an address from registering, disputing and ownership checks. It can still respond to disputes against it." },
+  { name: "unblacklist_address", kind: "write", who: "Admin", payable: "", args: "target", doc: "Reinstates an address." },
+  { name: "transfer_admin", kind: "write", who: "Admin", payable: "", args: "new_admin", doc: "Hands the admin role to another address. The zero address is refused." },
+
+  { name: "get_work", kind: "read", args: "work_id", doc: "One work record, or empty if the number is unknown." },
+  { name: "get_work_by_url", kind: "read", args: "url", doc: "The registration holding a link (after canonicalization)." },
+  { name: "get_first_author", kind: "read", args: "url", doc: "Who holds the first-author record for a link, following overturned registrations (chain)." },
+  { name: "list_works", kind: "read", args: "offset, limit", doc: "Works in registration order, at most 50 per page." },
+  { name: "list_works_by_author", kind: "read", args: "author, offset, limit", doc: "One author's works, at most 50 per page." },
+  { name: "get_dispute", kind: "read", args: "dispute_id", doc: "One dispute record." },
+  { name: "list_disputes_for_work", kind: "read", args: "work_id", doc: "Every dispute opened on a work." },
+  { name: "list_disputes_by_challenger", kind: "read", args: "challenger", doc: "Every dispute a wallet opened." },
+  { name: "list_disputes", kind: "read", args: "offset, limit", doc: "Disputes in opening order, at most 50 per page." },
+  { name: "get_author_stats", kind: "read", args: "address", doc: "Works registered, overturned, defences survived, disputes opened, upheld and rejected." },
+  { name: "get_balance", kind: "read", args: "address", doc: "Pending payout for a wallet, in wei." },
+  { name: "get_reward_pool", kind: "read", args: "", doc: "Reward pool balance, in wei." },
+  { name: "get_admin", kind: "read", args: "", doc: "The current admin address." },
+  { name: "get_blacklist_status", kind: "read", args: "address", doc: "Whether an address is blacklisted, and the reason." },
+  { name: "get_expected_proof", kind: "read", args: "address", doc: "The challenger's proof token, to put in <meta name=\"oar-proof\"> in the HTML head of their earlier page." },
+  { name: "get_work_proof", kind: "read", args: "work_id", doc: "The author's proof token for one registration, bound to the author and the work number." },
+  { name: "preview_canonical_url", kind: "read", args: "url", doc: "How the contract will store a link; reverts if the link is not accepted." },
+  { name: "get_registry_stats", kind: "read", args: "", doc: "Totals: works, disputes, upheld, rejected." },
+  { name: "get_accounting", kind: "read", args: "", doc: "Pool, bonds, stakes, pending, deposits, withdrawals and whether the books balance." },
+  { name: "get_config", kind: "read", args: "", doc: "Every constant: bond, stake, rewards, shares, fees, windows, cooldowns, attempts and content types." },
+];
+
+export const RULES = [
+  ["Validators report", "Contract code decides"],
+  ["Similarity of the archived challenger text and the registered text: IDENTICAL, SUBSTANTIALLY_SIMILAR, DIFFERENT or UNDETERMINED.", "DIFFERENT rejects the challenge. UNDETERMINED is inconclusive."],
+  ["Whether the evidence page is the same content as the registered page.", "Only SAME_CONTENT evidence with an archive or platform date can move the author's date earlier."],
+  ["Nothing else. Proof tags and dates are read by code, not by the model.", "The challenger's tag must be in the HTML head. A page's own claimed date is never used."],
+  ["Code reads dates from the Internet Archive capture (earliest capture of the link) or a known platform.", "The challenger must be earlier by at least one hour to win; later by one hour or more loses; in between, or without a trusted date, is inconclusive."],
+];
